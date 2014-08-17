@@ -56,6 +56,8 @@ namespace MuMech
         internal List<Group> servo_groups;  //Changed Scope so draganddrop can use it
         protected static MuMechGUI gui_controller;
         bool guiEnabled = false;
+        
+        ApplicationLauncherButton button;
 
 
         #region UITweaks
@@ -305,14 +307,26 @@ namespace MuMech
             }
             else
             {
-                //enabled = true;
-                guiEnabled = true;
-                groupEditorEnabled = true;
+            	//enabled = true;
+//            	guiEnabled = true;
+//            	groupEditorEnabled = true;
+				
+				GameEvents.onGUIApplicationLauncherReady.Add(onAppReady);
             }
         }
 
-
-
+        
+        void onAppReady() {
+        	if (button == null)
+        	{
+        		var stream = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("InfernalRobotics.IRbutton.png");
+        		var texButton = new Texture2D(38, 38);
+        		texButton.LoadImage(new System.IO.BinaryReader(stream).ReadBytes((int)stream.Length)); // embedded resource loading is stupid
+        		
+        		button = ApplicationLauncher.Instance.AddModApplication(delegate() { guiEnabled = true; }, delegate() { guiEnabled = false; }, null, null, null, null,
+        		                                                        ApplicationLauncher.AppScenes.FLIGHT | ApplicationLauncher.AppScenes.VAB | ApplicationLauncher.AppScenes.SPH, texButton);
+        	}
+        }
 
         void onVesselWasModified(Vessel v)
         {
@@ -334,6 +348,15 @@ namespace MuMech
             {
                 IRMinimizeButton.Destroy();
                 IRMinimizeGroupButton.Destroy();
+            }
+            else
+            {
+				GameEvents.onGUIApplicationLauncherReady.Remove(onAppReady);
+            	if (button != null)
+            	{
+	            	ApplicationLauncher.Instance.RemoveModApplication(button);
+	            	button = null;
+            	}
             }
             saveConfigXML();
         }
@@ -380,6 +403,13 @@ namespace MuMech
                     saveConfigXML();
                     guiEnabled = false;
                 }
+            }
+            else
+            {
+            	if (GUILayout.Button("Edit"))
+            	{
+            		groupEditorEnabled = !groupEditorEnabled;
+            	}
             }
             GUILayout.EndVertical();
 
@@ -956,24 +986,28 @@ namespace MuMech
             {
                 var height = GUILayout.Height(Screen.height / 2);
                 if (guiEnabled)
+                {
                     controlWinPos = GUILayout.Window(956, controlWinPos,
                                                      ControlWindow,
                                                      "Servo Control",
                                                      GUILayout.Width(250),
                                                      GUILayout.Height(80));
-                if (groupEditorEnabled)
-                    groupEditorWinPos = GUILayout.Window(958, groupEditorWinPos,
-                                                    GroupEditorWindow,
-                                                    "Servo Group Editor",
-                                                    GUILayout.Width(EditorWidth - 48), //Using a variable here
-                                                    height);
-                if (guiTweakEnabled)
-                    tweakWinPos = GUILayout.Window(959, tweakWinPos,
-                                                     tweakWindow,
-                                                     servoTweak.servoName,
-                                                     GUILayout.Width(100),
-                                                     GUILayout.Height(80));
-
+                	
+	                if (groupEditorEnabled)
+	                    groupEditorWinPos = GUILayout.Window(958, groupEditorWinPos,
+	                                                    GroupEditorWindow,
+	                                                    "Servo Group Editor",
+	                                                    GUILayout.Width(EditorWidth - 48), //Using a variable here
+	                                                    height);
+	                
+	                if (guiTweakEnabled)
+	                    tweakWinPos = GUILayout.Window(959, tweakWinPos,
+	                                                     tweakWindow,
+	                                                     servoTweak.servoName,
+	                                                     GUILayout.Width(100),
+	                	                                 GUILayout.Height(80));
+                }
+                
                 refreshKeysFromGUI();
             }
             else if (scene == GameScenes.EDITOR || scene == GameScenes.SPH)
