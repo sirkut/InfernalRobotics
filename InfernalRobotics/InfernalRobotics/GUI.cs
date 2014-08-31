@@ -960,6 +960,7 @@ namespace MuMech
                 {
                     updateGroupECRequirement(servoGroup);
                 }
+                initialGroupECUpdate = true;
             }
 
             if (controlWinPos.x == 0 && controlWinPos.y == 0)
