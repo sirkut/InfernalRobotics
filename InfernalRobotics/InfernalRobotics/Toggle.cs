@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using KSP.IO;
 using UnityEngine;
 using System.Linq;
 using KSPAPIExtensions;
@@ -284,6 +285,15 @@ namespace MuMech
         private static int s_creationOrder = 0;
         public int creationOrder = 0;
 
+        [KSPField(isPersistant = false)]
+        public float ElectricChargeRequired = 2.5f;
+        private const string ElectricChargeResourceName = "ElectricCharge";
+        public float GroupElectricChargeRequired = 2.5f;
+        private ECConstraintData ecConstraintData;
+        [KSPField(guiName = "E-State", guiActive = true, guiActiveEditor = true)]
+        public string ElectricStateDisplay = "n.a. EC/s required";
+        protected bool useEC = true;
+
         public bool isSymmMaster()
         {
             for (int i = 0; i < part.symmetryCounterparts.Count; i++)
@@ -438,6 +448,12 @@ namespace MuMech
 
         public override void OnAwake()
         {
+            this.loadConfigXML();
+            if (!useEC)
+            {
+                this.Fields["ElectricStateDisplay"].guiActive = false;
+                this.Fields["ElectricStateDisplay"].guiActiveEditor = false;
+            }
             FindTransforms();
             colliderizeChilds(model_transform);
             if (rotateJoint)
@@ -483,7 +499,10 @@ namespace MuMech
                 else if (translateJoint)
                     parseMinMaxTweaks(translateMin, translateMax);
 
-                this.ElectricStateDisplay = string.Format("{0:#.##}EC/s required", this.ElectricChargeRequired);
+                if (useEC)
+                {
+                    this.ElectricStateDisplay = string.Format("{0:#.##}EC/s required", this.ElectricChargeRequired);
+                }
             }
         }
 
@@ -941,20 +960,12 @@ namespace MuMech
             }
         */
 
-        [KSPField(isPersistant = false)]
-        public float ElectricChargeRequired = 2.5f;
-        private const string ElectricChargeResourceName = "ElectricCharge";
-        public float GroupElectricChargeRequired = 2.5f;
-        private ECConstraintData ecConstraintData;
-        [KSPField(guiName = "E-State", guiActive = true, guiActiveEditor = true)]
-        public string ElectricStateDisplay = "n.a. EC/s required";
-
         protected void updateRotation(float speed, bool reverse, int mask)
         {
             speed *= (speedTweak + speedTweakFine) * customSpeed * (reverse ? -1 : 1);
             rotation += getAxisInversion() * TimeWarp.fixedDeltaTime * speed * this.ecConstraintData.Ratio;
             rotationChanged |= mask;
-            if (this.ecConstraintData.Available)
+            if (!useEC || this.ecConstraintData.Available)
             {
                 playAudio();
             }
@@ -965,7 +976,7 @@ namespace MuMech
             speed *= (speedTweak + speedTweakFine) * customSpeed * (reverse ? -1 : 1);
             translation += getAxisInversion() * TimeWarp.fixedDeltaTime * speed * this.ecConstraintData.Ratio;
             translationChanged |= mask;
-            if (this.ecConstraintData.Available)
+            if (!useEC || this.ecConstraintData.Available)
             {
                 playAudio();
             }
@@ -1210,7 +1221,7 @@ namespace MuMech
 
         private double getAvailableElectricCharge()
         {
-            if (!HighLogic.LoadedSceneIsFlight)
+            if (!useEC || !HighLogic.LoadedSceneIsFlight)
             {
                 return ElectricChargeRequired;
             }
@@ -1266,22 +1277,25 @@ namespace MuMech
             doRotation();
             doTranslation();
 
-            if (this.ecConstraintData.RotationDone || this.ecConstraintData.TranslationDone)
+            if (useEC)
             {
-                this.part.RequestResource(ElectricChargeResourceName, this.ecConstraintData.ToConsume);
-                if (this.ecConstraintData.Available)
+                if (this.ecConstraintData.RotationDone || this.ecConstraintData.TranslationDone)
                 {
-                    this.ElectricStateDisplay = string.Format("active - {2}{0:#0.##}/{1:#0.##}EC/s", this.ecConstraintData.ToConsume, ElectricChargeRequired,
-                                                              this.ecConstraintData.ToConsume < ElectricChargeRequired ? "low power! " : string.Empty);
+                    this.part.RequestResource(ElectricChargeResourceName, this.ecConstraintData.ToConsume);
+                    if (this.ecConstraintData.Available)
+                    {
+                        this.ElectricStateDisplay = string.Format("active - {2}{0:#0.##}/{1:#0.##}EC/s", this.ecConstraintData.ToConsume, ElectricChargeRequired,
+                                                                  this.ecConstraintData.ToConsume < ElectricChargeRequired ? "low power! " : string.Empty);
+                    }
+                    else
+                    {
+                        this.ElectricStateDisplay = "not enough power!";
+                    }
                 }
                 else
                 {
-                    this.ElectricStateDisplay = "not enough power!";
+                    this.ElectricStateDisplay = string.Format("offline - {0:#0.##}EC/s required", this.ElectricChargeRequired);
                 }
-            }
-            else
-            {
-                this.ElectricStateDisplay = string.Format("offline - {0:#0.##}EC/s required", this.ElectricChargeRequired);
             }
 
             rotationChanged = 0;
@@ -1390,6 +1404,14 @@ namespace MuMech
                 this.RotationDone = false;
                 this.TranslationDone = false;
             }
+        }
+
+        public void loadConfigXML()
+        {
+            PluginConfiguration config = PluginConfiguration.CreateForType<MuMechToggle>();
+            config.load();
+            useEC = config.GetValue<bool>("useEC");
+
         }
     }
 }

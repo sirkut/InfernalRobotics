@@ -58,6 +58,7 @@ namespace MuMech
         protected static MuMechGUI gui_controller;
         bool guiEnabled = false;
         private static bool initialGroupECUpdate;
+        protected static bool useEC = true;
 
 
         #region UITweaks
@@ -89,8 +90,11 @@ namespace MuMech
             servo.forwardKey = to.forwardKey;
             servo.reverseKey = to.reverseKey;
 
-            updateGroupECRequirement(from);
-            updateGroupECRequirement(to);
+            if (useEC)
+            {
+                updateGroupECRequirement(from);
+                updateGroupECRequirement(to);
+            }
         }
 
         public static void add_servo(MuMechToggle servo)
@@ -119,7 +123,10 @@ namespace MuMech
                 if (group == null)
                 {
                     var newGroup = new Group(servo);
-                    updateGroupECRequirement(newGroup);
+                    if (useEC)
+                    {
+                        updateGroupECRequirement(newGroup);
+                    }
                     gui.servo_groups.Add(newGroup);
                     return;
                 }
@@ -138,7 +145,10 @@ namespace MuMech
             servo.forwardKey = group.forwardKey;
             servo.reverseKey = group.reverseKey;
 
-            updateGroupECRequirement(group);
+            if (useEC)
+            {
+                updateGroupECRequirement(group);
+            }
         }
 
         public static void remove_servo(MuMechToggle servo)
@@ -154,7 +164,10 @@ namespace MuMech
                 {
                     group.servos.Remove(servo);
 
-                    updateGroupECRequirement(group);
+                    if (useEC)
+                    {
+                        updateGroupECRequirement(group);
+                    }
                 }
                 num += group.servos.Count;
             }
@@ -210,9 +223,12 @@ namespace MuMech
                     IRMinimizeGroupButton.Visible = true;
                 }
 
-                foreach (var servoGroup in servo_groups)
+                if (useEC)
                 {
-                    updateGroupECRequirement(servoGroup);
+                    foreach (var servoGroup in servo_groups)
+                    {
+                        updateGroupECRequirement(servoGroup);
+                    }
                 }
             }
 
@@ -497,10 +513,13 @@ namespace MuMech
                 }
                 GUILayout.EndHorizontal();
 
-                GUILayout.BeginHorizontal();
-                GUILayout.Space(20);
-                GUILayout.Label(string.Format("Group requires {0:#0.##}EC/s", grp.groupTotalECRequirement),expand);
-                GUILayout.EndHorizontal();
+                if (useEC)
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Space(20);
+                    GUILayout.Label(string.Format("Group requires {0:#0.##}EC/s", grp.groupTotalECRequirement), expand);
+                    GUILayout.EndHorizontal();
+                }
 
                 GUILayout.BeginHorizontal();
 
@@ -728,10 +747,13 @@ namespace MuMech
                 }
                 GUILayout.EndHorizontal();
 
-                GUILayout.BeginHorizontal();
-                GUILayout.Space(20);
-                GUILayout.Label(string.Format("Group requires {0:#0.##}EC/s", grp.groupTotalECRequirement), expand);
-                GUILayout.EndHorizontal();
+                if (useEC)
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Space(20);
+                    GUILayout.Label(string.Format("Group requires {0:#0.##}EC/s", grp.groupTotalECRequirement), expand);
+                    GUILayout.EndHorizontal();
+                }
 
                 GUILayout.BeginHorizontal();
 
@@ -954,13 +976,16 @@ namespace MuMech
             if (InputLockManager.IsLocked(ControlTypes.LINEAR))
                 return;
 
-            if (!initialGroupECUpdate)
+            if (useEC)
             {
-                foreach (var servoGroup in servo_groups)
+                if (!initialGroupECUpdate)
                 {
-                    updateGroupECRequirement(servoGroup);
+                    foreach (var servoGroup in servo_groups)
+                    {
+                        updateGroupECRequirement(servoGroup);
+                    }
+                    initialGroupECUpdate = true;
                 }
-                initialGroupECUpdate = true;
             }
 
             if (controlWinPos.x == 0 && controlWinPos.y == 0)
@@ -1089,6 +1114,7 @@ namespace MuMech
             tweakWinPos = config.GetValue<Rect>("tweakWinPos");
             controlWinPos = config.GetValue<Rect>("controlWinPos");
             groupEditorWinPos = config.GetValue<Rect>("groupEditorWinPos");
+            useEC = config.GetValue<bool>("useEC");
 
         }
 
@@ -1099,6 +1125,7 @@ namespace MuMech
             config.SetValue("tweakWinPos", tweakWinPos);
             config.SetValue("controlWinPos", controlWinPos);
             config.SetValue("groupEditorWinPos", groupEditorWinPos);
+            config.SetValue("useEC", useEC);
             config.save();
         }
     }
