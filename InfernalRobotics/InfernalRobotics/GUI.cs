@@ -24,6 +24,7 @@ namespace MuMech
             public string reverseKey;
             public string speed;
             public bool showGUI;
+            public float groupTotalECRequirement;
 
             public Group(MuMechToggle servo)
             {
@@ -56,6 +57,7 @@ namespace MuMech
         internal List<Group> servo_groups;  //Changed Scope so draganddrop can use it
         protected static MuMechGUI gui_controller;
         bool guiEnabled = false;
+        private static bool initialGroupECUpdate;
 
 
         #region UITweaks
@@ -69,6 +71,16 @@ namespace MuMech
             get { return gui_controller; }
         }
 
+        static void updateGroupECRequirement(Group servoGroup)
+        {
+            var ecSum = servoGroup.servos.Select(s => s.ElectricChargeRequired).Sum();
+            foreach (var servo in servoGroup.servos)
+            {
+                servo.GroupElectricChargeRequired = ecSum;
+            }
+            servoGroup.groupTotalECRequirement = ecSum;
+        }
+
         static void move_servo(Group from, Group to, MuMechToggle servo)
         {
             to.servos.Add(servo);
@@ -76,6 +88,9 @@ namespace MuMech
             servo.groupName = to.name;
             servo.forwardKey = to.forwardKey;
             servo.reverseKey = to.reverseKey;
+
+            updateGroupECRequirement(from);
+            updateGroupECRequirement(to);
         }
 
         public static void add_servo(MuMechToggle servo)
@@ -103,7 +118,9 @@ namespace MuMech
                 }
                 if (group == null)
                 {
-                    gui.servo_groups.Add(new Group(servo));
+                    var newGroup = new Group(servo);
+                    updateGroupECRequirement(newGroup);
+                    gui.servo_groups.Add(newGroup);
                     return;
                 }
             }
@@ -120,6 +137,8 @@ namespace MuMech
             servo.groupName = group.name;
             servo.forwardKey = group.forwardKey;
             servo.reverseKey = group.reverseKey;
+
+            updateGroupECRequirement(group);
         }
 
         public static void remove_servo(MuMechToggle servo)
@@ -134,6 +153,8 @@ namespace MuMech
                 if (group.name == servo.groupName)
                 {
                     group.servos.Remove(servo);
+
+                    updateGroupECRequirement(group);
                 }
                 num += group.servos.Count;
             }
@@ -187,6 +208,11 @@ namespace MuMech
                 {
                     IRMinimizeButton.Visible = true;
                     IRMinimizeGroupButton.Visible = true;
+                }
+
+                foreach (var servoGroup in servo_groups)
+                {
+                    updateGroupECRequirement(servoGroup);
                 }
             }
 
@@ -309,6 +335,8 @@ namespace MuMech
                 guiEnabled = true;
                 groupEditorEnabled = true;
             }
+
+            initialGroupECUpdate = false;
         }
 
 
@@ -467,6 +495,11 @@ namespace MuMech
                         GUILayout.Space(60);
                     }
                 }
+                GUILayout.EndHorizontal();
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Space(20);
+                GUILayout.Label(string.Format("Group requires {0:#0.##}EC/s", grp.groupTotalECRequirement),expand);
                 GUILayout.EndHorizontal();
 
                 GUILayout.BeginHorizontal();
@@ -696,6 +729,11 @@ namespace MuMech
                 GUILayout.EndHorizontal();
 
                 GUILayout.BeginHorizontal();
+                GUILayout.Space(20);
+                GUILayout.Label(string.Format("Group requires {0:#0.##}EC/s", grp.groupTotalECRequirement), expand);
+                GUILayout.EndHorizontal();
+
+                GUILayout.BeginHorizontal();
 
                 GUILayout.Space(20);
 
@@ -915,6 +953,15 @@ namespace MuMech
                 return;
             if (InputLockManager.IsLocked(ControlTypes.LINEAR))
                 return;
+
+            if (!initialGroupECUpdate)
+            {
+                foreach (var servoGroup in servo_groups)
+                {
+                    updateGroupECRequirement(servoGroup);
+                }
+            }
+
             if (controlWinPos.x == 0 && controlWinPos.y == 0)
             {
                 controlWinPos = new Rect(Screen.width - 510, 70, 10, 10);

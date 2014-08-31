@@ -482,6 +482,8 @@ namespace MuMech
                     parseMinMaxTweaks(rotateMin, rotateMax);
                 else if (translateJoint)
                     parseMinMaxTweaks(translateMin, translateMax);
+
+                this.ElectricStateDisplay = string.Format("{0:#.##}EC/s required", this.ElectricChargeRequired);
             }
         }
 
@@ -938,20 +940,35 @@ namespace MuMech
                 gotOrig = false;
             }
         */
+
+        [KSPField(isPersistant = false)]
+        public float ElectricChargeRequired = 2.5f;
+        private const string ElectricChargeResourceName = "ElectricCharge";
+        public float GroupElectricChargeRequired = 2.5f;
+        private ECConstraintData ecConstraintData;
+        [KSPField(guiName = "E-State", guiActive = true, guiActiveEditor = true)]
+        public string ElectricStateDisplay = "n.a. EC/s required";
+
         protected void updateRotation(float speed, bool reverse, int mask)
         {
             speed *= (speedTweak + speedTweakFine) * customSpeed * (reverse ? -1 : 1);
-            rotation += getAxisInversion() * TimeWarp.fixedDeltaTime * speed;
+            rotation += getAxisInversion() * TimeWarp.fixedDeltaTime * speed * this.ecConstraintData.Ratio;
             rotationChanged |= mask;
-            playAudio();
+            if (this.ecConstraintData.Available)
+            {
+                playAudio();
+            }
         }
 
         protected void updateTranslation(float speed, bool reverse, int mask)
         {
             speed *= (speedTweak + speedTweakFine) * customSpeed * (reverse ? -1 : 1);
-            translation += getAxisInversion() * TimeWarp.fixedDeltaTime * speed;
+            translation += getAxisInversion() * TimeWarp.fixedDeltaTime * speed * this.ecConstraintData.Ratio;
             translationChanged |= mask;
-            playAudio();
+            if (this.ecConstraintData.Available)
+            {
+                playAudio();
+            }
         }
 
         protected bool keyPressed(string key)
@@ -1097,8 +1114,9 @@ namespace MuMech
                 else
                 {
                     Quaternion curRot = Quaternion.AngleAxis((invertSymmetry ? ((isSymmMaster() || (part.symmetryCounterparts.Count != 1)) ? 1 : -1) : 1) * rotation, rotateAxis);
-                    transform.FindChild("model").FindChild(rotate_model).localRotation = curRot;
+                    transform.FindChild("model").FindChild(rotate_model).localRotation = curRot;                    
                 }
+                this.ecConstraintData.RotationDone = true;
             }
         }
 
@@ -1112,8 +1130,9 @@ namespace MuMech
                 }
                 else
                 {
-                    joint.targetPosition = origTranslation - translateAxis.normalized * (translation - translationDelta);
+                    joint.targetPosition = origTranslation - translateAxis.normalized * (translation - translationDelta);                    
                 }
+                this.ecConstraintData.TranslationDone = true;
             }
         }
 
@@ -1189,6 +1208,18 @@ namespace MuMech
             }
         }
 
+        private double getAvailableElectricCharge()
+        {
+            if (!HighLogic.LoadedSceneIsFlight)
+            {
+                return ElectricChargeRequired;
+            }
+            var resDef = PartResourceLibrary.Instance.GetDefinition(ElectricChargeResourceName);
+            var resources = new List<PartResource>();
+            this.part.GetConnectedResources(resDef.id, resDef.resourceFlowMode, resources);
+            return resources.Count <= 0 ? 0f : resources.Select(r => r.amount).Sum();
+        }
+
         UI_FloatEdit rangeMinF;
         UI_FloatEdit rangeMinE;
         UI_FloatEdit rangeMaxF;
@@ -1226,12 +1257,32 @@ namespace MuMech
                 translationChanged = 4;
             }
 
+            this.ecConstraintData = new ECConstraintData(this.getAvailableElectricCharge(), ElectricChargeRequired * TimeWarp.fixedDeltaTime, GroupElectricChargeRequired * TimeWarp.fixedDeltaTime);
+
             checkInputs();
             checkRotationLimits();
             checkTranslationLimits();
 
             doRotation();
             doTranslation();
+
+            if (this.ecConstraintData.RotationDone || this.ecConstraintData.TranslationDone)
+            {
+                this.part.RequestResource(ElectricChargeResourceName, this.ecConstraintData.ToConsume);
+                if (this.ecConstraintData.Available)
+                {
+                    this.ElectricStateDisplay = string.Format("active - {2}{0:#0.##}/{1:#0.##}EC/s", this.ecConstraintData.ToConsume, ElectricChargeRequired,
+                                                              this.ecConstraintData.ToConsume < ElectricChargeRequired ? "low power! " : string.Empty);
+                }
+                else
+                {
+                    this.ElectricStateDisplay = "not enough power!";
+                }
+            }
+            else
+            {
+                this.ElectricStateDisplay = string.Format("offline - {0:#0.##}EC/s required", this.ElectricChargeRequired);
+            }
 
             rotationChanged = 0;
             translationChanged = 0;
@@ -1246,8 +1297,6 @@ namespace MuMech
             }
 
         }
-
-
 
         public override void OnInactive()
         {
@@ -1319,6 +1368,27 @@ namespace MuMech
                 case KSPActionType.Deactivate:
                     moveFlags &= ~0x400;
                     break;
+            }
+        }
+
+        protected class ECConstraintData
+        {
+            public float Ratio { get; set; }
+            public float ToConsume { get; set; }
+            public bool Available { get; set; }
+            public bool RotationDone { get; set; }
+            public bool TranslationDone { get; set; }
+            public bool Enough { get; set; }
+
+            public ECConstraintData(double totalECAvailable, float requiredEC, float groupRequiredEC)
+            {
+                this.Available = totalECAvailable > 0.01d;
+                this.Enough = this.Available && (totalECAvailable >= groupRequiredEC*0.1);
+                var groupRatio = totalECAvailable >= groupRequiredEC ? 1f : (float) totalECAvailable/groupRequiredEC;
+                this.Ratio = this.Enough ? groupRatio : 0f;
+                this.ToConsume = requiredEC*groupRatio;
+                this.RotationDone = false;
+                this.TranslationDone = false;
             }
         }
     }
