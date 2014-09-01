@@ -1284,8 +1284,9 @@ namespace MuMech
                     this.part.RequestResource(ElectricChargeResourceName, this.ecConstraintData.ToConsume);
                     if (this.ecConstraintData.Available)
                     {
-                        this.ElectricStateDisplay = string.Format("active - {2}{0:#0.##}/{1:#0.##}EC/s", this.ecConstraintData.ToConsume, ElectricChargeRequired,
-                                                                  this.ecConstraintData.ToConsume < (ElectricChargeRequired * TimeWarp.fixedDeltaTime) ? "low power! " : string.Empty);
+                        var displayConsume = this.ecConstraintData.ToConsume/TimeWarp.fixedDeltaTime;
+                        var lowPower = Mathf.Abs(ElectricChargeRequired - displayConsume) > Mathf.Abs(ElectricChargeRequired * .001f);
+                        this.ElectricStateDisplay = string.Format("active - {2}{0:#0.##}/{1:#0.##}EC/s", displayConsume, ElectricChargeRequired, lowPower ? "low power! " : string.Empty);
                     }
                     else
                     {
