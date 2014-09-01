@@ -1285,7 +1285,7 @@ namespace MuMech
                     if (this.ecConstraintData.Available)
                     {
                         this.ElectricStateDisplay = string.Format("active - {2}{0:#0.##}/{1:#0.##}EC/s", this.ecConstraintData.ToConsume, ElectricChargeRequired,
-                                                                  this.ecConstraintData.ToConsume < ElectricChargeRequired ? "low power! " : string.Empty);
+                                                                  this.ecConstraintData.ToConsume < (ElectricChargeRequired * TimeWarp.fixedDeltaTime) ? "low power! " : string.Empty);
                     }
                     else
                     {
