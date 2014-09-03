@@ -393,6 +393,13 @@ namespace MuMech
                     GUILayout.BeginHorizontal();
                     GUILayout.Label(g.name, GUILayout.ExpandWidth(true));
 
+                    if (useEC)
+                    {
+                        var totalConsumption = g.servos.Sum(servo => Mathf.Abs(servo.LastPowerDraw));
+                        var displayText = string.Format("({0:#0.##} Ec/s)", totalConsumption);
+                        GUILayout.Label(displayText, GUILayout.ExpandWidth(true));
+                    }
+
                     int forceFlags = 0;
                     var width20 = GUILayout.Width(20);
                     var width40 = GUILayout.Width(40);
@@ -517,7 +524,7 @@ namespace MuMech
                 {
                     GUILayout.BeginHorizontal();
                     GUILayout.Space(20);
-                    GUILayout.Label(string.Format("Group requires {0:#0.##}EC/s", grp.groupTotalECRequirement), expand);
+                    GUILayout.Label(string.Format("Estimated Power Draw: {0:#0.##} Ec/s", grp.groupTotalECRequirement), expand);
                     GUILayout.EndHorizontal();
                 }
 
@@ -751,7 +758,7 @@ namespace MuMech
                 {
                     GUILayout.BeginHorizontal();
                     GUILayout.Space(20);
-                    GUILayout.Label(string.Format("Group requires {0:#0.##}EC/s", grp.groupTotalECRequirement), expand);
+                    GUILayout.Label(string.Format("Estimated Power Draw: {0:#0.##} Ec/s", grp.groupTotalECRequirement), expand);
                     GUILayout.EndHorizontal();
                 }
 

@@ -291,8 +291,9 @@ namespace MuMech
         public float GroupElectricChargeRequired = 2.5f;
         private ECConstraintData ecConstraintData;
         [KSPField(guiName = "E-State", guiActive = true, guiActiveEditor = true)]
-        public string ElectricStateDisplay = "n.a. EC/s required";
+        public string ElectricStateDisplay = "n.a. Ec/s Power Draw est.";
         protected bool useEC = true;
+        public float LastPowerDraw;
 
         public bool isSymmMaster()
         {
@@ -501,7 +502,7 @@ namespace MuMech
 
                 if (useEC)
                 {
-                    this.ElectricStateDisplay = string.Format("{0:#.##}EC/s required", this.ElectricChargeRequired);
+                    this.ElectricStateDisplay = string.Format("{0:#0.##} Ec/s est. Power Draw", this.ElectricChargeRequired);
                 }
             }
         }
@@ -1282,20 +1283,23 @@ namespace MuMech
                 if (this.ecConstraintData.RotationDone || this.ecConstraintData.TranslationDone)
                 {
                     this.part.RequestResource(ElectricChargeResourceName, this.ecConstraintData.ToConsume);
+                    var displayConsume = this.ecConstraintData.ToConsume/TimeWarp.fixedDeltaTime;
                     if (this.ecConstraintData.Available)
-                    {
-                        var displayConsume = this.ecConstraintData.ToConsume/TimeWarp.fixedDeltaTime;
+                    {                    
                         var lowPower = Mathf.Abs(ElectricChargeRequired - displayConsume) > Mathf.Abs(ElectricChargeRequired * .001f);
-                        this.ElectricStateDisplay = string.Format("active - {2}{0:#0.##}/{1:#0.##}EC/s", displayConsume, ElectricChargeRequired, lowPower ? "low power! " : string.Empty);
+                        this.ElectricStateDisplay = string.Format("{2}{0:#0.##}/{1:#0.##} Ec/s", displayConsume, ElectricChargeRequired, lowPower ? "low power! - " : "active - ");
+                        LastPowerDraw = displayConsume;
                     }
                     else
                     {
                         this.ElectricStateDisplay = "not enough power!";
                     }
+                    LastPowerDraw = displayConsume;
                 }
                 else
                 {
-                    this.ElectricStateDisplay = string.Format("offline - {0:#0.##}EC/s required", this.ElectricChargeRequired);
+                    this.ElectricStateDisplay = string.Format("offline - {0:#0.##} Ec/s max.", this.ElectricChargeRequired);
+                    LastPowerDraw = 0f;
                 }
             }
 
@@ -1412,7 +1416,13 @@ namespace MuMech
             PluginConfiguration config = PluginConfiguration.CreateForType<MuMechToggle>();
             config.load();
             useEC = config.GetValue<bool>("useEC");
+        }
 
+        public void saveConfigXML()
+        {
+            PluginConfiguration config = PluginConfiguration.CreateForType<MuMechGUI>();
+            config.SetValue("useEC", useEC);
+            config.save();
         }
     }
 }
